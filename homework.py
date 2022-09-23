@@ -3,15 +3,14 @@ import os
 import sys
 import time
 
-
-import telegram
-import telegram.ext
 import requests
-from requests.exceptions import ConnectionError
-
-import exceptions as exc
-
+import telegram
 from dotenv import load_dotenv
+from http import HTTPStatus
+
+import exceptions
+import constants
+
 
 load_dotenv()
 
@@ -69,13 +68,13 @@ def get_api_answer(current_timestamp):
     """Получение ответа API в формате python."""
     bad_format = False
     cts_type = type(current_timestamp)
-    if (cts_type is not int) and (cts_type is not float):
+    if isinstance(cts_type, (int, float)):
         logger.warning(
             ('Тип current_timestamp не соответствует '
              f'ожидаемому: {cts_type}')
         )
         bad_format = True
-    if len(str(int(current_timestamp))) != 10:
+    if len(str(int(current_timestamp))) != constants.FALSE_CURRENT_TIMESTAMP:
         logger.warning(
             ('В переменную current_timestamp передано '
              f'некорректное число: {current_timestamp}')
@@ -87,43 +86,21 @@ def get_api_answer(current_timestamp):
         timestamp = current_timestamp
     params = {'from_date': timestamp}
     logger.debug(params)
+
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        resp_json = response.json()
-        if response.status_code == 200:
-            return resp_json
-        SERVER_FAULT_KEYS = ['error', 'code']
-        premessage = ''
-        fault_keys = False
-        for key in SERVER_FAULT_KEYS:
-            if key in resp_json:
-                fault_keys = True
-                error_descr = resp_json.get(key)
-                premessage = ('Признак отказа сервера.'
-                              f'Ошибка: "{error_descr}"\n')
-                premessage += premessage
-        if not fault_keys:
-            premessage = f'Недоступен URL "{ENDPOINT}". '
-        message = (
-            premessage,
-            f'Статус ответа API: {response.status_code}'
-            f'Запрос: {response.request.__list__}')
-        logger.error(message)
-        send_message(get_bot(), message)
-        raise ConnectionError('Ответ от эндпойнта отличается от 200')
-    except Exception as error:
-        message = (
-            f'Недоступен URL "{ENDPOINT}" '
-            f'по причине: {error}'
-        )
-        logger.error(message)
-        send_message(get_bot(), message)
-        raise ConnectionError('Обращение к эндпойнту выдаёт ошибку')
+    except exceptions.APIResponseStatusCodeException:
+        logger.error('Сбой при запросе к эндпоинту')
+    if response.status_code != HTTPStatus.OK:
+        msg = 'Ответ от эндпойнта отличается от 200'
+        logger.error(msg)
+        raise ConnectionError(msg)
+    return response.json()
 
 
 def check_response(response):
     """Проверка ответа на корректность."""
-    if type(response) == dict:
+    if isinstance(response, dict):
         response['current_date']
         homeworks = response['homeworks']
         if type(homeworks) == list:
@@ -154,7 +131,7 @@ def parse_status(homework):
         message = f'Недокументированный статус домашней работы({error})'
         logger.error(message)
         send_message(get_bot(), message)
-        raise exc.ImproperAPIAnswerException(
+        raise exceptions.UnknownHWStatusException(
             'Недокументированный статус домашней работы'
         )
     else:
@@ -196,16 +173,21 @@ def main():
 
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
         current_timestamp = int(time.time())
+        previous_error = None
 
         while True:
-            response = get_api_answer(current_timestamp)
+            try:
+                response = get_api_answer(current_timestamp)
+            except exceptions.ImproperAPIAnswerException as i:
+                if str(i) != previous_error:
+                    previous_error = str(i)
+                    send_message(bot, i)
+                    logger.error(i)
             logger.debug(f'get_api_answer вернула "{response}"')
             try:
                 homeworks = check_response(response)
                 if homeworks is False:
-                    raise exc.ImproperAPIAnswerException(
-                        'Получен некорректный ответ API'
-                    )
+                    logger.debug('Получен некорректный ответ API')
                 if len(homeworks) != 0:
                     new_status = parse_status(homeworks[0])
                     logger.debug(f'parse_status выдала "{new_status}"')
@@ -217,19 +199,23 @@ def main():
                     logger.debug('Новый статус не обнаружен')
 
                 current_timestamp = response.get('current_date')
-                time.sleep(RETRY_TIME)
 
             except Exception as error:
                 message = f'Сбой в работе программы: {error}'
                 logger.error(message)
                 send_message(get_bot(), message)
 
-                time.sleep(RETRY_TIME)
             else:
                 continue
+
+            finally:
+                time.sleep(RETRY_TIME)
+
     else:
+        sys.exit
+
         logger.critical('Переданы не все обязательные переменные окружения')
-        raise exc.TokensAreNotGivenException(
+        raise exceptions.TokensAreNotGivenException(
             'Ошибка передачи обязательных переменных окружения'
         )
 
