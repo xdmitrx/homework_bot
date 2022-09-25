@@ -101,9 +101,15 @@ def get_api_answer(current_timestamp):
 def check_response(response):
     """Проверка ответа на корректность."""
     if isinstance(response, dict):
-        response['current_date']
-        homeworks = response['homeworks']
-        if type(homeworks) == list:
+        try:
+            response['current_date']
+            homeworks = response['homeworks']
+        except KeyError as e:
+            msg = f'Ошибка доступа по ключу "{e}"'
+            logger.error(msg)
+            raise exceptions.CheckResponseException(msg)
+
+        if isinstance(homeworks, list):
             return homeworks
         else:
             raise SystemError('Тип ключа homeworks не list')
@@ -113,24 +119,19 @@ def check_response(response):
 
 def parse_status(homework):
     """Определяет статус последней работы."""
+    if 'homework_name' not in homework:
+        raise KeyError('Отсутствует ключ "homework_name" в ответе API')
+    if 'status' not in homework:
+        raise Exception('Отсутствует ключ "status" в ответе API')
     homework_name = homework['homework_name']
-    logger.info('Запущена функция "parse_status"')
-    keys = ['homework_name', 'status']
-    for key in keys:
-        if key not in homework.keys():
-            message = f'В ответе API не обнаружен ключ "{key}"'
-            logger.error(message)
-            send_message(get_bot(), message)
-            raise KeyError('Не обнаружены необходимые ключи в ответе API')
-
     homework_status = homework['status']
+    logger.info('Запущена функция "parse_status"')
     logger.debug(f'Получен статус домашней работы: {homework_status}')
     try:
         verdict = HOMEWORK_STATUSES[homework_status]
     except Exception as error:
         message = f'Недокументированный статус домашней работы({error})'
         logger.error(message)
-        send_message(get_bot(), message)
         raise exceptions.UnknownHWStatusException(
             'Недокументированный статус домашней работы'
         )
@@ -150,7 +151,7 @@ def check_tokens():
     }
     if None in TOKENS_DICT.values():
         no_tokens_list = []
-        for key in TOKENS_DICT.keys():
+        for key in TOKENS_DICT:
             if TOKENS_DICT[key] is None:
                 no_tokens_list.append(key)
         count = len([value for value in TOKENS_DICT.values() if value is None])
@@ -169,55 +170,50 @@ def main():
     """Основная логика работы бота."""
     tokens_exist = check_tokens()
     logger.debug(f'check_tokens вернула {tokens_exist}')
-    if tokens_exist:
-
-        bot = telegram.Bot(token=TELEGRAM_TOKEN)
-        current_timestamp = int(time.time())
-        previous_error = None
-
-        while True:
-            try:
-                response = get_api_answer(current_timestamp)
-            except exceptions.ImproperAPIAnswerException as i:
-                if str(i) != previous_error:
-                    previous_error = str(i)
-                    send_message(bot, i)
-                    logger.error(i)
-            logger.debug(f'get_api_answer вернула "{response}"')
-            try:
-                homeworks = check_response(response)
-                if homeworks is False:
-                    logger.debug('Получен некорректный ответ API')
-                if len(homeworks) != 0:
-                    new_status = parse_status(homeworks[0])
-                    logger.debug(f'parse_status выдала "{new_status}"')
-                    send_message(
-                        bot,
-                        new_status
-                    )
-                else:
-                    logger.debug('Новый статус не обнаружен')
-
-                current_timestamp = response.get('current_date')
-
-            except Exception as error:
-                message = f'Сбой в работе программы: {error}'
-                logger.error(message)
-                send_message(get_bot(), message)
-
-            else:
-                continue
-
-            finally:
-                time.sleep(RETRY_TIME)
-
-    else:
+    current_timestamp = int(time.time())
+    previous_error = None
+    if not tokens_exist:
         sys.exit
 
         logger.critical('Переданы не все обязательные переменные окружения')
         raise exceptions.TokensAreNotGivenException(
             'Ошибка передачи обязательных переменных окружения'
         )
+
+    while True:
+        try:
+            response = get_api_answer(current_timestamp)
+        except exceptions.ImproperAPIAnswerException as i:
+            if str(i) != previous_error:
+                previous_error = str(i)
+                send_message(telegram.bot, i)
+                logger.error(i)
+            logger.debug(f'get_api_answer вернула "{response}"')
+        try:
+            homeworks = check_response(response)
+            if homeworks is False:
+                logger.debug('Получен некорректный ответ API')
+            if len(homeworks) != 0:
+                new_status = parse_status(homeworks[0])
+                logger.debug(f'parse_status выдала "{new_status}"')
+                send_message(
+                    telegram.bot,
+                    new_status
+                )
+            else:
+                logger.debug('Новый статус не обнаружен')
+
+                current_timestamp = response.get('current_date')
+
+        except Exception as error:
+            message = f'Сбой в работе программы: {error}'
+            logger.error(message)
+
+        else:
+            continue
+
+        finally:
+            time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':

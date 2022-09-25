@@ -20,3 +20,9 @@ class APIResponseStatusCodeException(Exception):
     """Исключение сбоя запроса к API."""
 
     pass
+
+
+class CheckResponseException(Exception):
+    """Исключение неверного формата ответа API."""
+
+    pass
