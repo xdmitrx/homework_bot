@@ -58,7 +58,7 @@ def get_bot():
 
 def send_message(bot, message):
     """Отправка сообщения ботом."""
-    return bot.send_message(
+    bot.send_message(
         chat_id=TELEGRAM_CHAT_ID,
         text=message,
     )
@@ -171,28 +171,25 @@ def main():
     tokens_exist = check_tokens()
     logger.debug(f'check_tokens вернула {tokens_exist}')
     current_timestamp = int(time.time())
-    previous_error = None
     if not tokens_exist:
-        sys.exit
-
         logger.critical('Переданы не все обязательные переменные окружения')
-        raise exceptions.TokensAreNotGivenException(
-            'Ошибка передачи обязательных переменных окружения'
-        )
+        sys.exit()
 
     while True:
         try:
             response = get_api_answer(current_timestamp)
-        except exceptions.ImproperAPIAnswerException as i:
-            if str(i) != previous_error:
-                previous_error = str(i)
-                send_message(telegram.bot, i)
-                logger.error(i)
-            logger.debug(f'get_api_answer вернула "{response}"')
-        try:
             homeworks = check_response(response)
+        except Exception as error:
+            message = f'Сбой в работе программы: {error}'
+            logger.error(message)
+
             if homeworks is False:
-                logger.debug('Получен некорректный ответ API')
+                response
+                logger.debug(f'Получен некорректный ответ API "{response}"')
+                send_message(
+                    telegram.bot,
+                    response
+                )
             if len(homeworks) != 0:
                 new_status = parse_status(homeworks[0])
                 logger.debug(f'parse_status выдала "{new_status}"')
@@ -204,13 +201,6 @@ def main():
                 logger.debug('Новый статус не обнаружен')
 
                 current_timestamp = response.get('current_date')
-
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logger.error(message)
-
-        else:
-            continue
 
         finally:
             time.sleep(RETRY_TIME)
