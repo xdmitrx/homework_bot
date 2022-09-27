@@ -184,12 +184,7 @@ def main():
             logger.error(message)
 
             if homeworks is False:
-                response
-                logger.debug(f'Получен некорректный ответ API "{response}"')
-                send_message(
-                    telegram.bot,
-                    response
-                )
+                logger.debug('Получен некорректный ответ API')
             if len(homeworks) != 0:
                 new_status = parse_status(homeworks[0])
                 logger.debug(f'parse_status выдала "{new_status}"')
