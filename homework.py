@@ -67,11 +67,10 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Получение ответа API в формате python."""
     bad_format = False
-    cts_type = type(current_timestamp)
-    if isinstance(cts_type, (int, float)):
+    if isinstance(type, (int, float)):
         logger.warning(
             ('Тип current_timestamp не соответствует '
-             f'ожидаемому: {cts_type}')
+             f'ожидаемому: {type}')
         )
         bad_format = True
     if len(str(int(current_timestamp))) != constants.FALSE_CURRENT_TIMESTAMP:
@@ -100,7 +99,10 @@ def get_api_answer(current_timestamp):
 
 def check_response(response):
     """Проверка ответа на корректность."""
-    if isinstance(response, dict):
+    if not isinstance(response, dict):
+        raise TypeError('Ответ от Домашки не словарь')
+
+    while True:
         try:
             response['current_date']
             homeworks = response['homeworks']
@@ -113,8 +115,6 @@ def check_response(response):
             return homeworks
         else:
             raise SystemError('Тип ключа homeworks не list')
-    else:
-        raise TypeError('Ответ от Домашки не словарь')
 
 
 def parse_status(homework):
@@ -159,7 +159,7 @@ def check_tokens():
         if TOKENS_DICT['PRACTICUM_TOKEN'] is None and count == 1:
             logger.critical(message)
             send_message(get_bot(), message)
-            return False
+            raise SystemError('Ошибка отправки сообщения')
         logger.critical(message)
         return False
     logger.debug('Все переменные окружения доступны')
@@ -183,22 +183,18 @@ def main():
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
 
-            if homeworks is False:
-                logger.debug('Получен некорректный ответ API')
-            if len(homeworks) != 0:
-                new_status = parse_status(homeworks[0])
-                logger.debug(f'parse_status выдала "{new_status}"')
-                send_message(
-                    telegram.bot,
-                    new_status
-                )
-            else:
-                logger.debug('Новый статус не обнаружен')
-
-                current_timestamp = response.get('current_date')
-
         finally:
             time.sleep(RETRY_TIME)
+
+        if homeworks is False:
+            logger.debug('Получен некорректный ответ API')
+        if len(homeworks) != 0:
+            new_status = parse_status(homeworks[0])
+            logger.debug(f'parse_status выдала "{new_status}"')
+            send_message(get_bot(), new_status)
+        else:
+            logger.debug('Новый статус не обнаружен')
+            current_timestamp = response.get('current_date')
 
 
 if __name__ == '__main__':
