@@ -58,16 +58,20 @@ def get_bot():
 
 def send_message(bot, message):
     """Отправка сообщения ботом."""
-    bot.send_message(
-        chat_id=TELEGRAM_CHAT_ID,
-        text=message,
-    )
+    try:
+        bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=message,
+        )
+        logger.info('Сообщение в чат отправлено')
+    except exceptions.SendMessageFailure:
+        logger.error('Сбой при отправке сообщения в чат')
 
 
 def get_api_answer(current_timestamp):
     """Получение ответа API в формате python."""
     bad_format = False
-    if isinstance(type, (int, float)):
+    if isinstance(int, float):
         logger.warning(
             ('Тип current_timestamp не соответствует '
              f'ожидаемому: {type}')
@@ -102,19 +106,17 @@ def check_response(response):
     if not isinstance(response, dict):
         raise TypeError('Ответ от Домашки не словарь')
 
-    while True:
-        try:
-            response['current_date']
-            homeworks = response['homeworks']
-        except KeyError as e:
-            msg = f'Ошибка доступа по ключу "{e}"'
-            logger.error(msg)
-            raise exceptions.CheckResponseException(msg)
+    try:
+        response['current_date']
+        homeworks = response['homeworks']
+    except KeyError as e:
+        msg = f'Ошибка доступа по ключу "{e}"'
+        logger.error(msg)
+        raise exceptions.CheckResponseException(msg)
 
-        if isinstance(homeworks, list):
-            return homeworks
-        else:
-            raise SystemError('Тип ключа homeworks не list')
+    if not isinstance(homeworks, list):
+        raise ValueError('Тип ключа homeworks не list')
+    return homeworks
 
 
 def parse_status(homework):
@@ -144,19 +146,20 @@ def check_tokens():
     """Проверка полноты набора необходимых данных.
     Для авторизации и доступа к чату.
     """
-    TOKENS_DICT = {
+    tokens_dict = {
         'PRACTICUM_TOKEN': PRACTICUM_TOKEN,
         'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
         'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID
     }
-    if None in TOKENS_DICT.values():
+
+    if None in tokens_dict.values():
         no_tokens_list = []
-        for key in TOKENS_DICT:
-            if TOKENS_DICT[key] is None:
+        for key in tokens_dict:
+            if tokens_dict[key] is None:
                 no_tokens_list.append(key)
-        count = len([value for value in TOKENS_DICT.values() if value is None])
+        count = len([value for value in tokens_dict.values() if value is None])
         message = f'Нет переменных окружения: {",".join(no_tokens_list)}'
-        if TOKENS_DICT['PRACTICUM_TOKEN'] is None and count == 1:
+        if tokens_dict['PRACTICUM_TOKEN'] is None and count == 1:
             logger.critical(message)
             send_message(get_bot(), message)
             raise SystemError('Ошибка отправки сообщения')
@@ -168,33 +171,37 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-    tokens_exist = check_tokens()
-    logger.debug(f'check_tokens вернула {tokens_exist}')
-    current_timestamp = int(time.time())
-    if not tokens_exist:
+    if not check_tokens():
         logger.critical('Переданы не все обязательные переменные окружения')
         sys.exit()
 
     while True:
         try:
+            current_timestamp = int(time.time())
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
+            send_message(get_bot(), message)
+        except get_bot.send_message as ex:
+            denied_message = f'Ошибка отправки сообщения: {ex}'
+            denied_message != message
+            logger.error(denied_message)
 
+        else:
+            if homeworks is False:
+                wrong_response = 'Получен некорректный ответ API'
+                logger.error(wrong_response)
+            elif len(homeworks) != 0:
+                new_status = parse_status(homeworks[0])
+                logger.debug(f'parse_status выдала "{new_status}"')
+            else:
+                same_parse_status = 'Новый статус не обнаружен'
+                logger.debug(same_parse_status)
+                current_timestamp = response.get('current_date')
         finally:
             time.sleep(RETRY_TIME)
-
-        if homeworks is False:
-            logger.debug('Получен некорректный ответ API')
-        if len(homeworks) != 0:
-            new_status = parse_status(homeworks[0])
-            logger.debug(f'parse_status выдала "{new_status}"')
-            send_message(get_bot(), new_status)
-        else:
-            logger.debug('Новый статус не обнаружен')
-            current_timestamp = response.get('current_date')
 
 
 if __name__ == '__main__':

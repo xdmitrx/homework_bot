@@ -20,3 +20,9 @@ class CheckResponseException(Exception):
     """Исключение неверного формата ответа API."""
 
     pass
+
+
+class SendMessageFailure(Exception):
+    """Исключение отправки сообщения."""
+
+    pass
