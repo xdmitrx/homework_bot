@@ -64,8 +64,12 @@ def send_message(bot, message):
             text=message,
         )
         logger.info('Сообщение в чат отправлено')
-    except exceptions.SendMessageFailure:
-        logger.error('Сбой при отправке сообщения в чат')
+    except Exception as error:
+        logger.error(
+            f'Ошибка при отправке сообщения в чат {error}'
+        )
+        error = 'Ошибка при отправке сообщения в чат'
+        raise exceptions.SendMessageFailure(error)
 
 
 def get_api_answer(current_timestamp):
@@ -83,7 +87,7 @@ def get_api_answer(current_timestamp):
              f'некорректное число: {current_timestamp}')
         )
         bad_format = True
-    if bad_format is True:
+    if bad_format:
         timestamp = int(time.time())
     else:
         timestamp = current_timestamp
@@ -180,9 +184,10 @@ def main():
             current_timestamp = int(time.time())
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
+            raise exceptions.BotNotSendMessage
 
-        except exceptions.BotNotSendMessage as er:
-            denied_message = f'Ошибка отправки сообщения: {er}'
+        except exceptions.BotNotSendMessage as exc:
+            denied_message = f'Ошибка отправки сообщения: {exc}'
             logger.error(denied_message)
 
         except Exception as error:
@@ -191,16 +196,16 @@ def main():
             denied_message != message
             send_message(get_bot(), message)
 
-            if homeworks is False:
+            if not homeworks:
                 wrong_response = 'Получен некорректный ответ API'
                 logger.error(wrong_response)
             if len(homeworks) != 0:
                 new_status = parse_status(homeworks[0])
                 logger.debug(f'parse_status выдала "{new_status}"')
-        else:
-            same_parse_status = 'Новый статус не обнаружен'
-            logger.debug(same_parse_status)
-            current_timestamp = response.get('current_date')
+            else:
+                same_parse_status = 'Новый статус не обнаружен'
+                logger.debug(same_parse_status)
+                current_timestamp = response.get('current_date')
         finally:
             time.sleep(RETRY_TIME)
 
