@@ -184,17 +184,6 @@ def main():
             current_timestamp = int(time.time())
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            raise exceptions.BotNotSendMessage
-
-        except exceptions.BotNotSendMessage as exc:
-            denied_message = f'Ошибка отправки сообщения: {exc}'
-            logger.error(denied_message)
-
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logger.error(message)
-            denied_message != message
-            send_message(get_bot(), message)
 
             if not homeworks:
                 wrong_response = 'Получен некорректный ответ API'
@@ -206,6 +195,17 @@ def main():
                 same_parse_status = 'Новый статус не обнаружен'
                 logger.debug(same_parse_status)
                 current_timestamp = response.get('current_date')
+
+        except exceptions.SendMessageFailure as exc:
+            denied_message = f'Ошибка отправки сообщения: {exc}'
+            logger.error(denied_message)
+
+        except Exception as error:
+            message = f'Сбой в работе программы: {error}'
+            logger.error(message)
+            denied_message != message
+            send_message(get_bot(), message)
+
         finally:
             time.sleep(RETRY_TIME)
 

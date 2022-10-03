@@ -26,11 +26,3 @@ class SendMessageFailure(Exception):
     """Исключение отправки сообщения."""
 
     pass
-
-
-class BotNotSendMessage(Exception):
-    """Исключение отправки сообщения в ТГ.
-    При ошибке отправки сообщения об ошибке.
-    """
-
-    pass
