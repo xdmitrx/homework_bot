@@ -184,10 +184,11 @@ def main():
             current_timestamp = int(time.time())
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
+            denied_message = 'Ошибка отправки сообщения'
 
             if not homeworks:
                 wrong_response = 'Получен некорректный ответ API'
-                logger.error(wrong_response)
+                logger.debug(wrong_response)
             if len(homeworks) != 0:
                 new_status = parse_status(homeworks[0])
                 logger.debug(f'parse_status выдала "{new_status}"')
@@ -203,7 +204,8 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
-            denied_message != message
+            if denied_message != message:
+                denied_message = message
             send_message(get_bot(), message)
 
         finally:
