@@ -190,6 +190,7 @@ def main():
                 wrong_response = 'Получен некорректный ответ API'
                 logger.debug(wrong_response)
             if len(homeworks) != 0:
+                global status
                 new_status = parse_status(homeworks[0])
                 logger.debug(f'parse_status выдала "{new_status}"')
                 send_message(get_bot(), new_status)
