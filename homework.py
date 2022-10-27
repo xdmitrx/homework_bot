@@ -186,7 +186,7 @@ def main():
             homeworks = check_response(response)
             denied_message = 'Ошибка отправки сообщения'
 
-            if not homeworks:
+            if homeworks is False:
                 wrong_response = 'Получен некорректный ответ API'
                 logger.debug(wrong_response)
             if len(homeworks) != 0:
