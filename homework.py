@@ -185,7 +185,7 @@ def main():
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             denied_message = 'Ошибка отправки сообщения'
-            global status
+            previous_status = None
 
             if homeworks is False:
                 wrong_response = 'Получен некорректный ответ API'
@@ -198,7 +198,7 @@ def main():
                 same_parse_status = 'Новый статус не обнаружен'
                 logger.debug(same_parse_status)
                 if same_parse_status != new_status:
-                    same_parse_status = new_status
+                    same_parse_status = previous_status
                 send_message(get_bot(), same_parse_status)
                 current_timestamp = response.get('current_date')
 
