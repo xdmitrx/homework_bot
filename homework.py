@@ -195,11 +195,9 @@ def main():
                 logger.debug(f'parse_status выдала "{new_status}"')
                 send_message(get_bot(), new_status)
             else:
-                same_parse_status = 'Новый статус не обнаружен'
-                logger.debug(same_parse_status)
-                if same_parse_status != previous_status:
-                    same_parse_status = previous_status
-                send_message(get_bot(), same_parse_status)
+                new_status = previous_status
+                logger.debug('Новый статус не обнаружен')
+
                 current_timestamp = response.get('current_date')
 
         except exceptions.SendMessageFailure as exc:
