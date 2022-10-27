@@ -91,7 +91,7 @@ def get_api_answer(current_timestamp):
         timestamp = int(time.time())
     else:
         timestamp = current_timestamp
-    params = {'from_date': timestamp}
+    params = {'from_date': 0}
     logger.debug(params)
 
     try:
