@@ -192,6 +192,7 @@ def main():
             if len(homeworks) != 0:
                 new_status = parse_status(homeworks[0])
                 logger.debug(f'parse_status выдала "{new_status}"')
+                send_message(get_bot(), new_status)
             else:
                 same_parse_status = 'Новый статус не обнаружен'
                 logger.debug(same_parse_status)
